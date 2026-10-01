@@ -1,0 +1,60 @@
+{
+  "name": "Datonix - Sheet to Supabase sync",
+  "nodes": [
+    {
+      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 15}]}},
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {"__rl": true, "value": "1IWRJ7Kyu-B_nNhHUCAHUWYStaA0XxEuG3s3rQfhC99Y", "mode": "id"},
+        "sheetName": {"__rl": true, "value": "Daily Data Entry", "mode": "name"}
+      },
+      "name": "Read Daily Data Entry",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const num = v => { const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, '')); return isNaN(n) ? 0 : n; };\nconst map = new Map();\nfor (const it of $input.all()) {\n  const r = it.json;\n  const id = String(r['Employee ID'] || '').trim();\n  const d = String(r['Date'] || '').trim().slice(0, 10);\n  if (!id || !/^\\d{4}-\\d{2}-\\d{2}$/.test(d)) continue;\n  const shift = String(r['Shift'] || 'Morning').trim();\n  map.set(`${d}|${id}|${shift}`, {\n    entry_date: d,\n    employee_id: id,\n    shift,\n    productive_hours: num(r['Productive/Data Collection Hours']),\n    rejected_videos: num(r['Rejected Videos']),\n    rejection_pct: num(r['Rejection %']),\n    remarks: String(r['Remarks'] || '').trim() || null\n  });\n}\nreturn [{ json: { rows: [...map.values()] } }];"
+      },
+      "name": "Clean and dedupe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-PROJECT-REF.supabase.co/rest/v1/daily_entries?on_conflict=entry_date,employee_id,shift",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "apikey", "value": "YOUR_SERVICE_ROLE_KEY"},
+            {"name": "Authorization", "value": "Bearer YOUR_SERVICE_ROLE_KEY"},
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "Prefer", "value": "resolution=merge-duplicates,return=minimal"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.rows) }}"
+      },
+      "name": "Upsert into Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0]
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {"main": [[{"node": "Read Daily Data Entry", "type": "main", "index": 0}]]},
+    "Read Daily Data Entry": {"main": [[{"node": "Clean and dedupe", "type": "main", "index": 0}]]},
+    "Clean and dedupe": {"main": [[{"node": "Upsert into Supabase", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

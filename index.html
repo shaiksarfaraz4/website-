@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Datonix</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f4;--card:#fff;--ink:#14231d;--mut:#5d6b64;--ac:#0d7a5f;--ac2:#e8f4ef;--bd:#dfe4df;--bad:#b3261e;--ok:#0d7a5f}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1714;--card:#17221d;--ink:#e8efeb;--mut:#92a39a;--ac:#3fc9a0;--ac2:#1b2e27;--bd:#263830;--bad:#ff8a80;--ok:#3fc9a0}}
+:root[data-theme="dark"]{--bg:#0f1714;--card:#17221d;--ink:#e8efeb;--mut:#92a39a;--ac:#3fc9a0;--ac2:#1b2e27;--bd:#263830;--bad:#ff8a80;--ok:#3fc9a0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);z-index:5}
+.nav{max-width:1100px;margin:auto;padding:10px 16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.logo{font-weight:800;font-size:20px;letter-spacing:.5px;color:var(--ac);margin-right:auto;cursor:pointer}
+.nav a{padding:6px 10px;border-radius:8px;color:var(--mut);cursor:pointer;text-decoration:none;font-size:14px}
+.nav a.on,.nav a:hover{background:var(--ac2);color:var(--ac)}
+main{max-width:1100px;margin:auto;padding:20px 16px 60px}
+h1{font-size:34px;line-height:1.15;margin:.2em 0}h2{margin:1.2em 0 .5em}h3{margin:0 0 6px}
+.hero{padding:40px 0 20px}.hero p{max-width:620px;color:var(--mut);font-size:17px}
+.btn{background:var(--ac);color:#fff;border:0;padding:10px 18px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+.btn.s{background:var(--ac2);color:var(--ac)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px}
+.k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.6px}.v{font-size:26px;font-weight:700}
+.tw{overflow-x:auto;border:1px solid var(--bd);border-radius:14px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--bd)}
+th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase}tr:last-child td{border:0}
+.pill{padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--ac2);color:var(--ok)}
+.pill.b{background:#b3261e22;color:var(--bad)}
+input,select{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--ink);width:100%;margin:6px 0 12px}
+.bar{height:8px;background:var(--ac2);border-radius:9px;overflow:hidden;min-width:90px}.bar i{display:block;height:100%;background:var(--ac)}
+.tabs{display:flex;gap:8px;margin-bottom:12px}.note{color:var(--mut);font-size:13px;margin-top:10px}
+.login{max-width:400px;margin:30px auto}
+</style></head><body>
+<header><div class="nav" id="nav"></div></header>
+<main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+// ---- Supabase config: paste your values from Project Settings > API ----
+const SB_URL="PASTE_PROJECT_URL",SB_KEY="PASTE_ANON_KEY";
+const sb=supabase.createClient(SB_URL,SB_KEY);
+let E=[],D=[],MONTH="";
+const S={shift:8,target:5.3,days:26,monthT:137.8,r18:130.62,r15:108.85};
+const SHEET_TOTALS={hrs:445.07,payout:53100.55,base:423000};
+
+// ---- helpers ----
+const inr=n=>"₹"+Number(n).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
+const pill=(t,bad)=>`<span class="pill ${bad?"b":""}">${t}</span>`;
+const bar=p=>`<div class="bar"><i style="width:${Math.min(100,p)}%"></i></div>`;
+const tab=(h,rows)=>`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</table></div>`;
+const stat=(k,v,s="")=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="note" style="margin:0">${s}</div></div>`;
+let user=null,route="home",adminTab="Overview";
+
+const pub=["Home","About","Services","Projects","Certifications","Contact"];
+function nav(){document.getElementById("nav").innerHTML=`<span class="logo" onclick="go('home')">DATONIX</span>`+pub.map(p=>`<a class="${route===p.toLowerCase()?"on":""}" onclick="go('${p.toLowerCase()}')">${p}</a>`).join("")+
+(user?`<a class="on" onclick="go('dash')">${user.admin?"Admin":"My dashboard"}</a><a onclick="logout()">Logout</a>`:`<a class="on" onclick="go('login')">Login</a>`)}
+function go(r){route=r;nav();render();scrollTo(0,0)}
+
+function render(){
+ const a=document.getElementById("app");
+ const pages={
+ home:()=>`<div class="hero"><h1>Human data collection,<br>delivered at scale.</h1><p>Datonix runs trained teams that record, validate and deliver high-quality video datasets, with every hour, rejection and payment tracked.</p><button class="btn" onclick="go('services')">Our services</button> <button class="btn s" onclick="go('contact')">Contact us</button></div>
+  <div class="grid">${stat("Shifts","2","Morning &amp; Afternoon")}${stat("Daily target",S.target+" hrs","Productive hours per person")}${stat("Pay tiers","₹15k / ₹18k","Performance-linked monthly pay")}${stat("Reporting","Monthly","Hours, attendance, rejections, payouts")}</div>`,
+ about:()=>`<h2>About Datonix</h2><div class="card"><p>Datonix is a data collection and productivity company. Our team started in August 2026 and has grown quickly across Morning and Afternoon shifts, working on shared recording devices (SN1 to SN5).</p><p>Each shift is ${S.shift} hours with a ${S.target}-hour productive target. Pay is performance-linked at two tiers: ₹15,000 and ₹18,000 per month.</p></div>`,
+ services:()=>`<h2>Services</h2><div class="grid">${[["Video data collection","Structured recording sessions by trained specialists against daily hour targets."],["Quality review","Every video is reviewed; rejections are tracked per person and per day."],["Team onboarding","Trainee Recorder programme that moves people to Data Collection Specialist."],["Productivity reporting","Hours, attendance, rejection rate and payout reports per month."]].map(s=>`<div class="card"><h3>${s[0]}</h3><div class="note" style="margin:0">${s[1]}</div></div>`).join("")}</div>`,
+ projects:()=>`<h2>Projects &amp; experience</h2><div class="card"><h3>MTL data collection project</h3><p>Ongoing video data collection with daily hour targets, quality review and monthly payout reporting.</p>${pill("In progress")}</div><p class="note">Add more client projects here once you share them.</p>`,
+ certifications:()=>`<h2>Certifications</h2><div class="card"><p>Add your company registration, ISO or data-security certificates here.</p><p class="note">No certification details were in the spreadsheet, so none are shown.</p></div>`,
+ contact:()=>`<h2>Contact</h2><div class="card"><p>Email: <b>hello@datonix.example</b></p><p>Location: Guntur, Andhra Pradesh, India</p><p class="note">Replace with your real details.</p></div>`,
+ login:()=>`<div class="login card"><h3>Sign in</h3><label>Email</label><input id="em" type="email" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password"><button class="btn" onclick="login()">Sign in</button> <button class="btn s" onclick="forgot()">Forgot password</button><p class="note" id="msg">Use the email on your Datonix employee record.</p></div>`,
+ dash:()=>!user?`<p>Please log in.</p>`:user.admin?admin():emp()};
+ a.innerHTML=(pages[route]||pages.home)();
+
+}
+async function login(){const {error}=await sb.auth.signInWithPassword({email:document.getElementById("em").value.trim(),password:document.getElementById("pw").value});if(error){document.getElementById("msg").textContent=error.message;return}await boot();go("dash")}
+async function forgot(){const e=document.getElementById("em").value.trim();if(!e){document.getElementById("msg").textContent="Enter your email first.";return}const {error}=await sb.auth.resetPasswordForEmail(e,{redirectTo:location.href});document.getElementById("msg").textContent=error?error.message:"Reset link sent to your email."}
+async function logout(){await sb.auth.signOut();user=null;E=[];D=[];go("home")}
+async function togglePaid(i){const e=E[i];e.paid=!e.paid;const {error}=await sb.from("payouts").upsert({month:MONTH,employee_id:e.id,payment_status:e.paid?"Paid":"Pending",paid_on:e.paid?new Date().toISOString().slice(0,10):null});if(error){e.paid=!e.paid;alert(error.message)}render()}
+async function boot(){const {data:{session}}=await sb.auth.getSession();if(!session){user=null;return}
+ const {data:me}=await sb.from("employees").select("*").eq("auth_user_id",session.user.id).maybeSingle();
+ const {data:emps}=await sb.from("employees").select("*").neq("role","admin").order("employee_id");
+ const {data:mo}=await sb.from("v_monthly").select("*").order("month",{ascending:false});
+ MONTH=mo&&mo[0]?mo[0].month:new Date().toISOString().slice(0,7);
+ const M={};(mo||[]).filter(r=>r.month===MONTH).forEach(r=>M[r.employee_id]=r);
+ E=(emps||[]).map(x=>{const m=M[x.employee_id]||{},p=+(m.final_payout||0);return{id:x.employee_id,name:x.name,email:x.email,dev:x.device||"-",join:x.joining_date,role:x.role_title||"",base:+x.monthly_salary,pres:+(m.days_present||0),abs:S.days-(+(m.days_present||0)),shift:+(m.shift_hours||0),hrs:+(m.productive_hours||0),avg:+(m.avg_daily_hours||0),pct:+(m.productivity_pct||0),rej:+(m.rejected_videos||0),rejp:+(m.rejection_pct||0),pay:p,short:+x.monthly_salary-p,paid:m.payment_status==="Paid"}});
+ const {data:dd}=await sb.from("v_daily").select("*").order("entry_date");
+ D=(dd||[]).map(r=>[r.entry_date,r.employee_id,r.shift,+r.productive_hours,+r.rejected_videos,+r.daily_earned,r.remarks||""]);
+ user=me&&me.role==="admin"?{admin:true}:(E.find(e=>me&&e.id===me.employee_id)||null)}
+function emp(){const e=user,my=D.filter(d=>d.id===e.id),st=e.paid?"Paid":"Pending";
+ return `<h2>Welcome, ${e.name}</h2><p class="note">${e.id} · ${e.role} · Device ${e.dev} · Joined ${e.join}</p>
+ <div class="grid">${stat("Productive hours",e.hrs.toFixed(2),"Target "+S.monthT+" hrs")}${stat("Productivity",e.pct+"%",bar(e.pct))}${stat("Attendance",e.pres+" / "+S.days,e.abs+" days absent")}${stat("Rejected videos",e.rej.toFixed(2),e.rejp+"% rejection")}${stat("Payout (Sep)",inr(e.pay),"Shortfall "+inr(e.short))}${stat("Payment status",pill(st,st!=="Paid"),"Base salary "+inr(e.base))}</div>
+ <h2>My daily entries</h2>${my.length?tab(["Date","Shift","Hours","vs target","Rejected","Earned","Remarks"],my.map(d=>[d[0],d[2],d[3],bar(d[3]/S.target*100),d[4],inr(d[5]),d[6]||"-"])):`<p class="note">No daily entries synced yet for you.</p>`}`}
+
+function admin(){const T=["Overview","Employees","Hours","Attendance","Rejections","Payments","Reports"];
+ let b="";const q=sum(E,e=>e.pay);
+ if(adminTab==="Overview")b=`<div class="grid">${stat("Employees",E.length)}${stat("Total hours",sum(E,e=>e.hrs).toFixed(2))}${stat("Avg daily hrs",(sum(E,e=>e.avg)/E.length).toFixed(2),"Target "+S.target)}${stat("Total payout",inr(q),"Loaded rows")}</div>`;
+ if(adminTab==="Employees")b=tab(["ID","Name","Email","Device","Joined","Role","Salary","Status"],E.map(e=>[e.id,e.name,e.email,e.dev,e.join,e.role,inr(e.base),pill("Active")]));
+ if(adminTab==="Hours")b=tab(["ID","Name","Productive hrs","Target","Avg/day","Productivity"],E.map(e=>[e.id,e.name,e.hrs.toFixed(2),S.monthT,e.avg,bar(e.pct)+e.pct+"%"]))+`<h2>Daily entries</h2>`+tab(["Date","ID","Shift","Hours","Rejected","Earned","Remarks"],D.map(d=>[d[0],d[1],d[2],d[3],d[4],inr(d[5]),d[6]||"-"]));
+ if(adminTab==="Attendance")b=tab(["ID","Name","Present","Absent","Shift hours","Attendance"],E.map(e=>[e.id,e.name,e.pres,e.abs,e.shift,bar(e.pres/S.days*100)]));
+ if(adminTab==="Rejections")b=tab(["ID","Name","Rejected videos","Rejection %","Approval %"],[...E].sort((x,y)=>y.rejp-x.rejp).map(e=>[e.id,e.name,e.rej.toFixed(2),e.rejp+"%",pill((100-e.rejp).toFixed(1)+"%",e.rejp>5)]));
+ if(adminTab==="Payments")b=tab(["ID","Name","Base","Payout","Shortfall","Status",""],E.map((e,i)=>[e.id,e.name,inr(e.base),inr(e.pay),inr(e.short),pill(e.paid?"Paid":"Pending",!e.paid),`<button class="btn s" onclick="togglePaid(${i})">${e.paid?"Mark pending":"Mark paid"}</button>`]))+`<p class="note">Paid/Pending is new: the sheet has no payment status column yet.</p>`;
+ if(adminTab==="Reports"){const r=[...E].sort((x,y)=>y.hrs-x.hrs);b=tab(["Rank","Name","Total hrs","Daily avg","Status","Rejected","Rej %","Payout","Shortfall"],r.map((e,i)=>[i+1,e.name,e.hrs.toFixed(2),e.avg,pill(e.avg>=S.target?"On target":"Below Target",e.avg<S.target),e.rej.toFixed(2),e.rejp+"%",inr(e.pay),inr(e.short)]))}
+ return `<h2>Admin dashboard</h2><div class="tabs" style="flex-wrap:wrap">${T.map(t=>`<button class="btn ${t===adminTab?"":"s"}" onclick="adminTab='${t}';render()">${t}</button>`).join("")}</div>${b}`}
+nav();render();boot().then(()=>{nav();render()});
+</script></body></html>
